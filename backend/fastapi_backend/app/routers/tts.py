@@ -1,13 +1,15 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.tts import TTSRequest, TTSResponse
+from fastapi.responses import FileResponse
+
+from app.schemas.tts import TTSRequest
 from app.services.tts_service import generate_tts_audio
 
 router = APIRouter(prefix="/tts", tags=["tts"])
 
-@router.post("/synthesize", response_model=TTSResponse)
+@router.post("/synthesize")
 async def synthesize(payload: TTSRequest):
     if not payload.text.strip():
-        raise HTTPException(400, "Text cannot be empty")
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
 
     audio_path = generate_tts_audio(
         text=payload.text,
@@ -15,8 +17,8 @@ async def synthesize(payload: TTSRequest):
         slow=payload.slow
     )
 
-    return TTSResponse(
-        text=payload.text,
-        audio_path=audio_path,
-        language=payload.language
+    return FileResponse(
+        path=audio_path,
+        media_type="audio/mpeg",
+        filename="tts.mp3"
     )

@@ -5,7 +5,3 @@ class TTSRequest(BaseModel):
     language: str = "en"
     slow: bool = False
 
-class TTSResponse(BaseModel):
-    text: str
-    audio_path: str
-    language: str
