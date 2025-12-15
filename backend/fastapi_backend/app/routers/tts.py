@@ -17,8 +17,10 @@ async def synthesize(payload: TTSRequest):
         slow=payload.slow
     )
 
+    filename = f"{payload.question_id}.mp3"
+
     return FileResponse(
         path=audio_path,
         media_type="audio/mpeg",
-        filename="tts.mp3"
+        filename=filename
     )
