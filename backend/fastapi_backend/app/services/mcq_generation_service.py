@@ -8,44 +8,44 @@ from app.config import settings
 
 model_name = settings.HF_EVAL_MODEL_NAME
 
+class MCQGenerationService:
 
-def generate_mcqs_service(input_request: MCQGenerationRequest):
+    def generate_mcqs_service(self, input_request: MCQGenerationRequest):
 
-    input_request = input_request.model_dump()
-    
-    required_fields = ["topic_id", "topic", "subject", "num_questions"]
+        input_request = input_request.model_dump()
+        
+        required_fields = ["topic_id", "topic", "subject", "num_questions"]
 
-    for field in required_fields:
-        if field not in input_request:
+        for field in required_fields:
+            if field not in input_request:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Missing required field: {field}"
+                )
+
+        try:
+            generator = MCQGenerator(
+                model_name = model_name,
+                global_model = models.ai_model
+            )
+        except ModelLoadException as e:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Missing required field: {field}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e)
             )
 
-    try:
-        generator = MCQGenerator(
-            model_name = model_name,
-            global_model = models.ai_model
-        )
-    except ModelLoadException as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    
+        try:
+            result = generator.generate(input_request)
+            return result
 
-   
-    try:
-        result = generator.generate(input_request)
-        return result
+        except Exception as e:
+            print("Generation error: ", e)
 
-    except MCQGenerationException as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected MCQ generation error: {str(e)}"
-        )
+            return {
+                "topic_id": input_request.topic_id,
+                "topic": input_request.topic,
+                "mcqs": ["No mcqs could be generated due to model error"]
+            }
+        
+generation_service = MCQGenerationService()
