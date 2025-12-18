@@ -34,7 +34,7 @@ class HFModelCreation:
                 "text-generation",
                 model=model,
                 tokenizer=tokenizer,
-                max_new_tokens=600,
+                max_new_tokens=1500,
                 temperature=0.0,
                 do_sample=False,
                 eos_token_id=tokenizer.eos_token_id,
