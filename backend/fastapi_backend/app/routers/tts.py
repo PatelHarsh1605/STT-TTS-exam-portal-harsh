@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from app.schemas.tts import TTSRequest
 from app.services.tts_service import generate_tts_audio
 
-router = APIRouter(prefix="/tts", tags=["tts"])
+router = APIRouter(prefix="/tts", tags=["Text-To-Speech"])
 
 @router.post("/synthesize")
 async def synthesize(payload: TTSRequest):

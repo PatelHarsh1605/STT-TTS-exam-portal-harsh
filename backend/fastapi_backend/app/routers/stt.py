@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.schemas.stt import STTResponse
 from app.services.stt_service import transcribe
 
-router = APIRouter(prefix="/stt", tags=["stt"])
+router = APIRouter(prefix="/stt", tags=["Speech-To-Text"])
 
 ALLOWED = {
     "audio/wav", "audio/x-wav", "audio/mpeg",

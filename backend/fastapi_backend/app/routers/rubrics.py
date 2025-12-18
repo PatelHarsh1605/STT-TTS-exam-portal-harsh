@@ -4,7 +4,7 @@ from app.services.rubrics_service import generate_rubrics_service
 
 router = APIRouter(
     prefix = "/rubrics",
-    tags = ["rubrics"]
+    tags = ["Rubrics"]
 )
 
 @router.post("/create", response_model= RubricsResponse)

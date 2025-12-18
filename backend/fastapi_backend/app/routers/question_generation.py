@@ -4,7 +4,7 @@ from app.services.question_generation_service import generation_service
 
 router = APIRouter(
     prefix="/questions_generate",
-    tags = ["questions_generation"]
+    tags = ["Questions Generation"]
 )
 
 @router.post("/generate", response_model= QuestionGenerationResponse)
