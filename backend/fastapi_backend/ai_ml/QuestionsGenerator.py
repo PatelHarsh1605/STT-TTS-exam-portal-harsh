@@ -26,36 +26,40 @@ class QuestionsGenerator:
 
     
     def chain_creator(self):
-        parser = JsonOutputParser(pydantic_object=OutputResponse)
+        try:
+            parser = JsonOutputParser(pydantic_object=OutputResponse)
 
-        template = """
-You are an exam evaluator. 
-You have to generate some number of questions on the given topic from the subject given below
+            template = """
+    You are an exam evaluator. 
+    You have to generate some number of questions on the given topic from the subject given below
 
-Be sure that the questions are well stuctured and to the context of the topic and must fall within the subject as requested
-Return ONLY valid JSON. If JSON is malformed, fix it and return valid JSON
+    Be sure that the questions are well stuctured and to the context of the topic and must fall within the subject as requested
+    Return ONLY valid JSON. If JSON is malformed, fix it and return valid JSON
 
-Number of questions: {num_questions},
+    Number of questions: {num_questions},
 
-Topic: {topic}
+    Topic: {topic}
 
-Suject: {subject}
+    Suject: {subject}
 
-{format_instructions}
-"""
+    {format_instructions}
+    """
 
-        prompt = PromptTemplate(
-            template=template,
-            input_variables= ["num_questions", "topic", "subject"],
-            partial_variables= {
-                "format_instructions": parser.get_format_instructions()
-            }
-        )
+            prompt = PromptTemplate(
+                template=template,
+                input_variables= ["num_questions", "topic", "subject"],
+                partial_variables= {
+                    "format_instructions": parser.get_format_instructions()
+                }
+            )
 
 
-        chain = prompt | self.get_model()
+            chain = prompt | self.get_model()
 
-        return chain, parser
+            return chain, parser
+
+        except Exception as e:
+            raise ChainCreationException(f"Could not create chain due to error {str(e)}")
 
     def sanitize_json(self, text: str) -> str:
         text = text.replace("```json", "").replace("```", "").strip()
@@ -103,4 +107,4 @@ Suject: {subject}
             return parser.parse(cleaned)
 
         except Exception as e:
-            print(f"Some error occured! Details: {e}")
+            raise QuestionsGenerationException(f"Questions generation failed: {str(e)}")

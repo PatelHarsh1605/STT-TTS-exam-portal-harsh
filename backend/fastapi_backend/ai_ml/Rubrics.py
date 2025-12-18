@@ -2,6 +2,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 
 from ai_ml.ModelCreator import HFModelCreation
+from ai_ml.AIExceptions import *
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Annotated, Optional
@@ -74,8 +75,8 @@ Total Marks: {max_marks}
             return chain, parser
 
         except Exception as e:
-            print("Rubric chain creation error:", e)
-            return ""
+            raise ChainCreationException(f"Rubric chain creation error: {str(e)}")
+            
 
     def create_rubrics(self, input_features: dict):
 
@@ -140,4 +141,4 @@ Total Marks: {max_marks}
             return result_dict
 
         except Exception as e:
-            print("Rubrics creation error. Details: ", e)
+            raise RubricsGenerationException(f"Rubrics creation error. Details: {str(e)}")

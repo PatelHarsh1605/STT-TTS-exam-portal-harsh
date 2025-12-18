@@ -1,31 +1,20 @@
 from typing import Dict
 from fastapi import HTTPException, status
-
+from app.schemas.mcq_generation import MCQGenerationRequest
 from ai_ml.MCQGenerator import MCQGenerator
-from ai_ml.AIExceptions import (
-    ModelLoadError,
-    MCQGenerationError
-)
+from ai_ml.AIExceptions import *
+from app.core import models
+from app.config import settings
 
-# --------------------------------------------------
-# MCQ Generation Service
-# --------------------------------------------------
+model_name = settings.HF_EVAL_MODEL_NAME
 
-def generate_mcqs_service(input_request: Dict):
-    """
-    Service layer for MCQ generation.
 
-    This function:
-    - Validates required inputs
-    - Initializes MCQGenerator
-    - Calls generation logic
-    - Returns structured response
-    """
+def generate_mcqs_service(input_request: MCQGenerationRequest):
 
-    # -------------------------------
-    # 1️⃣ Basic Input Validation
-    # -------------------------------
+    input_request = input_request.model_dump()
+    
     required_fields = ["topic_id", "topic", "subject", "num_questions"]
+
     for field in required_fields:
         if field not in input_request:
             raise HTTPException(
@@ -33,27 +22,23 @@ def generate_mcqs_service(input_request: Dict):
                 detail=f"Missing required field: {field}"
             )
 
-    # -------------------------------
-    # 2️⃣ Initialize Generator
-    # -------------------------------
     try:
         generator = MCQGenerator(
-            model_name="microsoft/phi-2"  # CPU safe model
+            model_name = model_name,
+            global_model = models.ai_model
         )
-    except ModelLoadError as e:
+    except ModelLoadException as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
 
-    # -------------------------------
-    # 3️⃣ Generate MCQs
-    # -------------------------------
+   
     try:
         result = generator.generate(input_request)
         return result
 
-    except MCQGenerationError as e:
+    except MCQGenerationException as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

@@ -10,4 +10,4 @@ router = APIRouter(prefix="/mcqs", tags=["MCQ Generation"])
 
 @router.post("/generate", response_model=MCQGenerationResponse)
 async def generate_mcqs(payload: MCQGenerationRequest):
-    return generate_mcqs_service(payload.dict())
+    return generate_mcqs_service(payload)

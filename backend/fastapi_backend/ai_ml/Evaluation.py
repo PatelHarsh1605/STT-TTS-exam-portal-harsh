@@ -6,6 +6,7 @@ from typing import List, Annotated
 import re
 
 from ai_ml.ModelCreator import HFModelCreation
+from ai_ml.AIExceptions import *
 
 class EvalSchema(BaseModel):
     score: Annotated[int, Field(title="Score of student")]
@@ -70,8 +71,7 @@ Maximum Marks: {max_marks}
             return chain, parser
 
         except Exception as e:
-            print("Error creating evaluation chain:", e)
-            return None, None
+            raise ChainCreationException(f"Could not create chain due to error {str(e)}")
 
     def model_evaluator(self, input_features: dict):
         try:

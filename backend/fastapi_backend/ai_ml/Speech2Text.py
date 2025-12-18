@@ -1,27 +1,7 @@
-"""
-Module for conversion of speech audio fetched by FastAPI to text format in given language.
-
-USAGE :
---------------------------------
-from ai_ml.Speech2Text import STT
-stt = STT(lang="en", model="whisper", audio_file_name=audio_file_path)
-stt.transcribe()
-print(stt.transcription_list)
-
-USAGE (recommended with preloaded Whisper model):
--------------------------------------------------
-from app.main import whisper_model
-from ai_ml.Speech2Text import STT
-
-stt = STT(lang="en", model="whisper", audio_file_name=audio_file_path)
-text = stt.transcribe_with_existing_model(whisper_model, audio_file_path)
-"""
-
 from __future__ import annotations
 import warnings
 warnings.filterwarnings("ignore")
 
-# Imports
 
 from transformers import pipeline
 
