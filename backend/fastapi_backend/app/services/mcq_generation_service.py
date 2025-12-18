@@ -43,9 +43,21 @@ class MCQGenerationService:
             print("Generation error: ", e)
 
             return {
-                "topic_id": input_request.topic_id,
-                "topic": input_request.topic,
-                "mcqs": ["No mcqs could be generated due to model error"]
-            }
+            "topic_id": input_request["topic_id"],
+            "topic": input_request["topic"],
+            "mcqs": [
+                {
+                    "question": "MCQ generation failed due to model error",
+                    "options": [
+                        {"option_id": "A", "text": "Retry later"},
+                        {"option_id": "B", "text": "Retry later"},
+                        {"option_id": "C", "text": "Retry later"},
+                        {"option_id": "D", "text": "Retry later"},
+                    ],
+                    "correct_option": "A"
+                }
+            ]
+        }
+
         
 generation_service = MCQGenerationService()
