@@ -37,7 +37,7 @@ class MCQGenerator:
 
     def get_model(self):
         if self.global_model is None:
-            HFModelCreation.hf_model_creator(self.model_name)
+            self.global_model = HFModelCreation.hf_model_creator(self.model_name)
         return self.global_model
 
     def create_chain(self):
