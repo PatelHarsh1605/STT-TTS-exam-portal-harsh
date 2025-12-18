@@ -13,7 +13,7 @@ router = APIRouter(prefix="/mcqs", tags=["MCQ Generation"])
 async def generate_mcqs(payload: MCQGenerationRequest):
     response = generation_service.generate_mcqs_service(payload)
 
-    if not response.mcqs:
+    if response is None:
         raise HTTPException(
             status_code=500,
             detail="Model failed to generate mcqs"
