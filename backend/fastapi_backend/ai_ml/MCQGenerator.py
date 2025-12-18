@@ -115,7 +115,7 @@ class MCQGenerator:
             else:
                 output_text = str(raw_output)
 
-            cleaned_json = self._sanitize_json(output_text)
+            cleaned_json = self.sanitize_json(output_text)
 
             return parser.parse(cleaned_json)
 
