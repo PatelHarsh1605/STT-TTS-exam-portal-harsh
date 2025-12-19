@@ -22,8 +22,6 @@ class MCQ(BaseModel):
 
 
 class MCQOutput(BaseModel):
-    topic_id: str
-    topic: str
     mcqs: List[MCQ]
 
 

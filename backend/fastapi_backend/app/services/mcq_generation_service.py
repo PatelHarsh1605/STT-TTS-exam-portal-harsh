@@ -1,3 +1,4 @@
+
 from fastapi import HTTPException, status
 from app.schemas.mcq_generation import MCQGenerationRequest
 from ai_ml.MCQGenerator import MCQGenerator
@@ -36,7 +37,11 @@ class MCQGenerationService:
     
         try:
             result = generator.generate(input_request)
-            return result
+            return {
+                "topic_id": input_request["topic_id"],
+                "topic": input_request["topic"],
+                "mcqs": result.mcqs
+            }
 
         except Exception as e:
             print("Generation error: ", e)
