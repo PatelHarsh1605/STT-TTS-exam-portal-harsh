@@ -40,28 +40,16 @@ class MCQGenerationService:
             return {
                 "topic_id": input_request["topic_id"],
                 "topic": input_request["topic"],
-                "mcqs": result.mcqs
+                "mcqs": result["mcqs"]
             }
 
         except Exception as e:
             print("Generation error: ", e)
 
-            return {
-            "topic_id": input_request["topic_id"],
-            "topic": input_request["topic"],
-            "mcqs": [
-                {
-                    "question": "MCQ generation failed due to model error",
-                    "options": [
-                        {"option_id": "A", "text": "Retry later"},
-                        {"option_id": "B", "text": "Retry later"},
-                        {"option_id": "C", "text": "Retry later"},
-                        {"option_id": "D", "text": "Retry later"},
-                    ],
-                    "correct_option": "A"
-                }
-            ]
-        }
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail = str(e)
+            )
 
         
 generation_service = MCQGenerationService()
