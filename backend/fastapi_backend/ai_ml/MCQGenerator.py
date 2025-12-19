@@ -48,6 +48,7 @@ class MCQGenerator:
     You are an expert exam paper setter.
 
     Generate {num_questions} multiple-choice questions (MCQs) based on the following topic.
+    Do NOT stop generation until ALL {num_questions} MCQs are generated.
 
     Rules:
     - Each MCQ must have exactly 4 options labeled A, B, C, D

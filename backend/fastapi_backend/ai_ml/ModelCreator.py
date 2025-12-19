@@ -35,8 +35,9 @@ class HFModelCreation:
                 model=model,
                 tokenizer=tokenizer,
                 max_new_tokens=1500,
-                temperature=0.0,
-                do_sample=False,
+                temperature=0.7,
+                do_sample=True,
+                top_p=0.9,
                 eos_token_id=tokenizer.eos_token_id,
                 pad_token_id=tokenizer.eos_token_id,
                 return_full_text=False
