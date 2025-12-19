@@ -72,16 +72,15 @@ class QuestionsGenerator:
 
 
     def create_questions(self, input_request: dict):
-        if "topic" not in input_request:
-            raise KeyError("Input request must contain the topic related to which you want questions")
-        
-        elif "subject" not in input_request:
-            raise KeyError("Input request must contain the subject related to which you want questions")
-
-        elif "num_questions" not in input_request:
-            raise KeyError("Input request must contain the number of questions you want related to the topic")
-        
         try:
+            if "topic" not in input_request:
+                raise KeyError("Input request must contain the topic related to which you want questions")
+            
+            elif "subject" not in input_request:
+                raise KeyError("Input request must contain the subject related to which you want questions")
+
+            elif "num_questions" not in input_request:
+                raise KeyError("Input request must contain the number of questions you want related to the topic")
             
             chain, parser = self.chain_creator()
 

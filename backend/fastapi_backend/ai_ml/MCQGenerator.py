@@ -33,12 +33,12 @@ class MCQGenerator:
 
     def __init__(self, model_name: str, global_model = None):
         self.model_name = model_name
-        self.global_model = global_model
+        self.model = global_model
 
     def get_model(self):
-        if self.global_model is None:
-            self.global_model = HFModelCreation.hf_model_creator(self.model_name)
-        return self.global_model
+        if self.model is None:
+            self.model = HFModelCreation.hf_model_creator(self.model_name)
+        return self.model
 
     def create_chain(self):
         try:
@@ -65,7 +65,7 @@ class MCQGenerator:
 
             prompt = PromptTemplate(
                 template=template,
-                input_variables=["topic_id", "topic", "subject", "num_questions"],
+                input_variables=["num_questions","topic_id", "topic", "subject"],
                 partial_variables={
                     "format_instructions": parser.get_format_instructions()
                 }

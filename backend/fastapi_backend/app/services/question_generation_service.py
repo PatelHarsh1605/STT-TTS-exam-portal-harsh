@@ -2,6 +2,9 @@ from app.schemas.question_generation import QuestionGenerationRequest
 from app.core import models
 from ai_ml.QuestionsGenerator import QuestionsGenerator
 from app.config import settings
+from ai_ml.AIExceptions import *
+
+from fastapi import HTTPException, status
 
 model_name = settings.HF_EVAL_MODEL_NAME
 
@@ -15,7 +18,20 @@ class QuestionGenerationService:
 
             # Use models.ai_model loaded during lifespan
 
-            result = QuestionsGenerator(model_name=model_name, global_model=models.ai_model).create_questions(data)
+            generator = QuestionsGenerator(
+                model_name=model_name, 
+                global_model=models.ai_model
+            )
+        
+        except ModelLoadException as e:
+            raise HTTPException(
+                status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail = str(e)
+            )
+    
+        try:
+            result = generator.create_questions(data)
+            
 
             required_keys = ["topic", "questions"]
 

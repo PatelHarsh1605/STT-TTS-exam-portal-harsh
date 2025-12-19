@@ -1,4 +1,4 @@
-from typing import List, Dict, Annotated, Optional
+from typing import List, Annotated
 from pydantic import BaseModel, Field, StringConstraints
 
 class QuestionGenerationRequest(BaseModel):

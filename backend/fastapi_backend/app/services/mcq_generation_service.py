@@ -1,4 +1,3 @@
-from typing import Dict
 from fastapi import HTTPException, status
 from app.schemas.mcq_generation import MCQGenerationRequest
 from ai_ml.MCQGenerator import MCQGenerator
