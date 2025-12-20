@@ -40,7 +40,7 @@ class MCQGenerationService:
             return {
                 "topic_id": input_request["topic_id"],
                 "topic": input_request["topic"],
-                "mcqs": result["mcqs"]
+                "mcqs": result.mcqs
             }
 
         except Exception as e:

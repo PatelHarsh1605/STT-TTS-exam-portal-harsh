@@ -34,14 +34,14 @@ class HFModelCreation:
                 "text-generation",
                 model=model,
                 tokenizer=tokenizer,
-                max_new_tokens=1500,
-                temperature=0.7,
-                do_sample=True,
-                top_p=0.9,
+                max_new_tokens=1200,
+                temperature=0.3,
+                do_sample=False,
                 eos_token_id=tokenizer.eos_token_id,
                 pad_token_id=tokenizer.eos_token_id,
                 return_full_text=False
             )
+
 
             return HuggingFacePipeline(pipeline=gen)
 

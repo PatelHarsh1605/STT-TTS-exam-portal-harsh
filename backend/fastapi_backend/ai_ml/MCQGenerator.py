@@ -4,6 +4,7 @@ import re
 from pydantic import BaseModel, Field
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.exceptions import OutputParserException
 
 from ai_ml.ModelCreator import HFModelCreation
 from ai_ml.AIExceptions import *
@@ -43,28 +44,35 @@ class MCQGenerator:
             parser = JsonOutputParser(pydantic_object=MCQOutput)
 
             template = """
-    You are an expert exam paper setter.
+You are an expert exam paper setter.
 
-    Generate {num_questions} multiple-choice questions (MCQs) based on the following topic.
-    Do NOT stop generation until ALL {num_questions} MCQs are generated.
+Generate EXACTLY {num_questions} MCQs.
 
-    STRICT Rules:
-    - Each MCQ must have exactly 4 options labeled A, B, C, D
-    - Only ONE option must be correct
-    - Questions must strictly belong to the subject
-    - Difficulty should be appropriate for exams
-    - Output MUST be valid JSON only    
-    - Do NOT add explanations
-    - Do NOT add headings like "Question 1"
-    - Do NOT output plain text
-    - Follow the schema EXACTLY
+STRICT RULES:
+- Output MUST be a SINGLE valid JSON object
+- The JSON MUST follow this schema EXACTLY
+- Do NOT add numbering like 1., 2.
+- Do NOT add explanations
+- Do NOT add markdown
+- Do NOT add extra text
 
-    Topic ID: {topic_id}
-    Topic: {topic}
-    Subject: {subject}
+The root object MUST be:
+{
+  "mcqs": [ ... ]
+}
 
-    {format_instructions}
-    """
+Each MCQ:
+- question: string
+- options: exactly 4 options with A, B, C, D
+- correct_option: one of A, B, C, D
+
+Topic ID: {topic_id}
+Topic: {topic}
+Subject: {subject}
+
+{format_instructions}
+"""
+
 
             prompt = PromptTemplate(
                 template=template,
@@ -82,45 +90,30 @@ class MCQGenerator:
             raise ChainCreationException(f"Could not create chain due to error: {str(e)}")
             
 
-    def sanitize_json(self, text: str) -> str:
-        text = text.replace("```json", "").replace("```", "").strip()
-        match = re.search(r"\{[\s\S]*\}", text)
-        if match:
-            text = match.group(0)
-        text = re.sub(r",\s*}", "}", text)
-        text = re.sub(r",\s*]", "]", text)
-        return text
-
     def generate(self, input_request: dict) -> MCQOutput:
+        chain, parser = self.create_chain()
+
+        raw_output = chain.invoke(input_request)
+
+        if hasattr(raw_output, "content"):
+            output_text = raw_output.content
+        else:
+            output_text = str(raw_output)
+
         try:
-        
-            if "topic" not in input_request:
-                raise KeyError("Input request must contain the topic related to which you want questions")
-            
-            elif "subject" not in input_request:
-                raise KeyError("Input request must contain the subject related to which you want questions")
-
-            elif "num_questions" not in input_request:
-                raise KeyError("Input request must contain the number of questions you want related to the topic")
-        
-
-            chain, parser = self.create_chain()
-
-            raw_output = chain.invoke(input_request)
-
-            # Extract text safely
-            if isinstance(raw_output, dict) and "text" in raw_output:
-                output_text = raw_output["text"]
-
-            elif hasattr(raw_output, "generations"):
-                output_text = raw_output.generations[0][0].text
-
-            else:
-                output_text = str(raw_output)
-
-            cleaned_json = self.sanitize_json(output_text)
-
-            return parser.parse(cleaned_json)
-
+            parsed = parser.parse(output_text)
         except Exception as e:
-            raise MCQGenerationException(f"MCQ generation failed: {str(e)}")
+            raise MCQGenerationException(
+                f"Invalid JSON from model.\nRaw output:\n{output_text}"
+            )
+
+        if not isinstance(parsed, MCQOutput):
+            raise MCQGenerationException(
+                f"Parser returned unexpected type: {type(parsed)}"
+            )
+
+        return parsed
+
+    
+
+    
