@@ -48,12 +48,16 @@ class MCQGenerator:
     Generate {num_questions} multiple-choice questions (MCQs) based on the following topic.
     Do NOT stop generation until ALL {num_questions} MCQs are generated.
 
-    Rules:
+    STRICT Rules:
     - Each MCQ must have exactly 4 options labeled A, B, C, D
     - Only ONE option must be correct
     - Questions must strictly belong to the subject
     - Difficulty should be appropriate for exams
-    - Output MUST be valid JSON only
+    - Output MUST be valid JSON only    
+    - Do NOT add explanations
+    - Do NOT add headings like "Question 1"
+    - Do NOT output plain text
+    - Follow the schema EXACTLY
 
     Topic ID: {topic_id}
     Topic: {topic}
