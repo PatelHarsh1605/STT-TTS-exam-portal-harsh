@@ -92,20 +92,39 @@ Subject: {subject}
             raise ChainCreationException(
                 f"Could not create chain due to error: {str(e)}")
 
-    def _extract_text(self, raw_output) -> str:
+    def extract_text(self, raw_output) -> str:
+
+        # Case 1: LangChain returns string
         if isinstance(raw_output, str):
             return raw_output
-        if hasattr(raw_output, "content"):
-            return raw_output.content
+
+        # Case 2: HuggingFacePipeline returns list[dict]
+        if isinstance(raw_output, list):
+            if len(raw_output) == 0:
+                raise MCQGenerationException("Empty output from model")
+
+            item = raw_output[0]
+            if isinstance(item, dict) and "generated_text" in item:
+                return item["generated_text"]
+
+        # Case 3: LLMResult style
         if hasattr(raw_output, "generations"):
             return raw_output.generations[0][0].text
-        return str(raw_output)
+
+        # Case 4: content attribute
+        if hasattr(raw_output, "content"):
+            return raw_output.content
+
+        raise MCQGenerationException(
+            f"Could not extract text from model output: {type(raw_output)}"
+        )
+
 
     def generate(self, input_request: dict) -> MCQOutput:
         chain, parser = self.create_chain()
 
         raw_output = chain.invoke(input_request)
-        output_text = self._extract_text(raw_output)
+        output_text = self.extract_text(raw_output)
 
         try:
             parsed = parser.parse(output_text)

@@ -39,7 +39,7 @@ class HFModelCreation:
                 do_sample=False,
                 eos_token_id=tokenizer.eos_token_id,
                 pad_token_id=tokenizer.eos_token_id,
-                return_full_text=False
+                return_full_text=True
             )
 
 
