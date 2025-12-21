@@ -1,6 +1,5 @@
 from typing import List
 import re
-import json
 
 from pydantic import BaseModel, Field
 from langchain_core.prompts import PromptTemplate
@@ -37,35 +36,27 @@ class MCQGenerator:
 
     def create_chain(self):
         try:
-            # Simple template without JsonOutputParser format instructions
-            # We handle parsing manually in generate()
+            # Use simple text format instead of JSON - much easier for model to generate
             template = """You are an expert exam paper setter.
 
-Generate EXACTLY {num_questions} MCQs.
+Generate EXACTLY {num_questions} MCQs on the following topic.
 
-IMPORTANT: Return ONLY valid JSON, nothing else. No explanation, no markdown, no extra text.
+FORMAT: Use this exact format for each question:
 
-The response must be a single valid JSON object with this exact structure:
-{{
-  "mcqs": [
-    {{
-      "question": "the question text here",
-      "options": [
-        {{"option_id": "A", "text": "option A text"}},
-        {{"option_id": "B", "text": "option B text"}},
-        {{"option_id": "C", "text": "option C text"}},
-        {{"option_id": "D", "text": "option D text"}}
-      ],
-      "correct_option": "A"
-    }}
-  ]
-}}
+Question {num}: [Question text here?]
+A) [Option A text]
+B) [Option B text]
+C) [Option C text]
+D) [Option D text]
+Answer: [A/B/C/D]
+
+---
 
 Topic ID: {topic_id}
 Topic: {topic}
 Subject: {subject}
 
-Generate the JSON response now:"""
+Generate the MCQs now:"""
 
             prompt = PromptTemplate(
                 template=template,
@@ -74,7 +65,7 @@ Generate the JSON response now:"""
 
             chain = prompt | self.get_model()
 
-            return chain, None  # Return None for parser since we handle it manually
+            return chain
 
         except Exception as e:
             raise ChainCreationException(
@@ -109,92 +100,98 @@ Generate the JSON response now:"""
             f"Could not extract text from model output: {type(raw_output)}\nOutput: {str(raw_output)[:500]}"
         )
 
-    def extract_json_from_text(self, text: str) -> str:
-        """
-        Extract JSON object from text that may contain other content.
-        Finds the first { and last } that form a valid JSON object.
-        """
-        # Find the first opening brace
-        start_idx = text.find('{')
-        if start_idx == -1:
-            raise MCQGenerationException(f"No JSON object found in output: {text[:300]}")
-        
-        # Try to find matching closing brace
-        brace_count = 0
-        end_idx = -1
-        
-        for i in range(start_idx, len(text)):
-            if text[i] == '{':
-                brace_count += 1
-            elif text[i] == '}':
-                brace_count -= 1
-                if brace_count == 0:
-                    end_idx = i + 1
-                    break
-        
-        if end_idx == -1:
-            raise MCQGenerationException(f"Malformed JSON in output: {text[:300]}")
-        
-        json_str = text[start_idx:end_idx]
-        
-        # Validate it's actual JSON
-        try:
-            json.loads(json_str)
-        except json.JSONDecodeError as e:
-            raise MCQGenerationException(f"Invalid JSON extracted: {str(e)}\nJSON: {json_str[:300]}")
-        
-        return json_str
-
-
     def generate(self, input_request: dict) -> MCQOutput:
-        chain, parser = self.create_chain()
+        chain = self.create_chain()
 
         raw_output = chain.invoke(input_request)
         output_text = self.extract_text(raw_output)
 
-        # Extract JSON from potentially mixed text content
-        try:
-            json_text = self.extract_json_from_text(output_text)
-        except MCQGenerationException:
-            json_text = output_text
+        # Parse the plain text MCQs into structured format
+        mcqs = self.parse_mcqs_from_text(output_text, input_request["num_questions"])
+        
+        return MCQOutput(mcqs=mcqs)
 
-        # Parse JSON directly without LangChain's JsonOutputParser due to errors
-        try:
-            json_dict = json.loads(json_text)
-        except json.JSONDecodeError as e:
+    def parse_mcqs_from_text(self, text: str, expected_count: int) -> List[MCQ]:
+        """
+        Parse MCQs from plain text format:
+        
+        Question 1: [text]?
+        A) [text]
+        B) [text]
+        C) [text]
+        D) [text]
+        Answer: [A/B/C/D]
+        """
+        mcqs = []
+        
+        # Split by "Question N:" pattern
+        question_pattern = r'Question\s+\d+:\s*(.+?)(?=Question\s+\d+:|$)'
+        question_blocks = re.findall(question_pattern, text, re.IGNORECASE | re.DOTALL)
+        
+        if not question_blocks:
             raise MCQGenerationException(
-                f"Failed to parse JSON: {str(e)}\n--- JSON TEXT ---\n{json_text[:500]}"
+                f"Could not find any MCQs in output. Expected {expected_count} MCQs.\n"
+                f"Output was:\n{text[:500]}"
             )
 
-        # Manually validate and create MCQOutput using Pydantic
-        try:
-            parsed = MCQOutput(**json_dict)
-        except ValueError as e:
-            raise MCQGenerationException(
-                f"Invalid MCQ structure: {str(e)}\n--- JSON ---\n{json.dumps(json_dict, indent=2)[:500]}"
-            )
-        except Exception as e:
-            raise MCQGenerationException(
-                f"Unexpected error creating MCQOutput: {str(e)}\n--- JSON ---\n{json.dumps(json_dict, indent=2)[:500]}"
-            )
+        for block in question_blocks:
+            try:
+                mcq = self.parse_single_mcq(block)
+                mcqs.append(mcq)
+            except Exception as e:
+                # Skip malformed questions and continue
+                print(f"Warning: Could not parse MCQ block: {str(e)}")
+                continue
 
-        if parsed is None:
+        if len(mcqs) != expected_count:
             raise MCQGenerationException(
-                f"Failed to create MCQOutput from valid JSON: {json_text[:300]}"
+                f"Expected {expected_count} MCQs, but got {len(mcqs)}"
             )
 
-        if len(parsed.mcqs) != input_request["num_questions"]:
+        return mcqs
+
+    def parse_single_mcq(self, block: str) -> MCQ:
+        """Parse a single MCQ from text block"""
+        
+        # Extract question
+        question_match = re.search(r'^(.+?)(?=\nA\)|A\))', block, re.DOTALL)
+        if not question_match:
+            raise MCQGenerationException("Could not find question text")
+        
+        question_text = question_match.group(1).strip()
+        # Remove "Question N:" prefix if present
+        question_text = re.sub(r'^Question\s+\d+:\s*', '', question_text, flags=re.IGNORECASE).strip()
+        
+        # Extract options
+        options = []
+        option_pattern = r'([A-D])\)\s*(.+?)(?=[A-D]\)|Answer:|$)'
+        option_matches = re.findall(option_pattern, block, re.DOTALL | re.IGNORECASE)
+        
+        if len(option_matches) < 4:
+            raise MCQGenerationException(f"Could not find 4 options. Found {len(option_matches)}")
+        
+        for option_id, option_text in option_matches[:4]:
+            option_text = option_text.strip()
+            # Remove trailing newlines and extra whitespace
+            option_text = re.sub(r'\n+.*$', '', option_text).strip()
+            options.append(MCQOption(option_id=option_id.upper(), text=option_text))
+        
+        # Extract correct answer
+        answer_match = re.search(r'Answer:\s*([A-D])', block, re.IGNORECASE)
+        if not answer_match:
+            raise MCQGenerationException("Could not find Answer field")
+        
+        correct_option = answer_match.group(1).upper()
+        
+        # Validate correct option is in options
+        option_ids = {opt.option_id for opt in options}
+        if correct_option not in option_ids:
             raise MCQGenerationException(
-                f"Expected {input_request['num_questions']} MCQs, "
-                f"but got {len(parsed.mcqs)}"
+                f"Correct option '{correct_option}' not in options {option_ids}"
             )
-
-        for idx, mcq in enumerate(parsed.mcqs, start=1):
-            option_ids = {opt.option_id for opt in mcq.options}
-            if mcq.correct_option not in option_ids:
-                raise MCQGenerationException(
-                    f"MCQ {idx}: correct_option '{mcq.correct_option}' "
-                    f"not in options {option_ids}"
-                )
-
-        return parsed
+        
+        return MCQ(
+            question=question_text,
+            options=options,
+            correct_option=correct_option
+        )
