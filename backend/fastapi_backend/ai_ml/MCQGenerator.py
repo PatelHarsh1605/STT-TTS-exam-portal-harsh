@@ -143,6 +143,7 @@ Now generate {num_questions} MCQs with sequential numbering:"""
                 f"Output was:\n{text[:500]}"
             )
 
+        # Parse all found questions
         for block in question_blocks:
             try:
                 mcq = self.parse_single_mcq(block)
@@ -152,9 +153,15 @@ Now generate {num_questions} MCQs with sequential numbering:"""
                 print(f"Warning: Could not parse MCQ block: {str(e)}")
                 continue
 
-        if len(mcqs) != expected_count:
+        # If we got more questions than expected, take only the first N
+        if len(mcqs) > expected_count:
+            print(f"Warning: Generated {len(mcqs)} MCQs but expected {expected_count}. Taking first {expected_count}.")
+            mcqs = mcqs[:expected_count]
+        
+        # Check if we have enough questions
+        if len(mcqs) < expected_count:
             raise MCQGenerationException(
-                f"Expected {expected_count} MCQs, but got {len(mcqs)}"
+                f"Expected {expected_count} MCQs, but only got {len(mcqs)}"
             )
 
         return mcqs
