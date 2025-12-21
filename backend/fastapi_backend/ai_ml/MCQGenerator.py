@@ -1,5 +1,6 @@
 from typing import List
 import re
+import json
 
 from pydantic import BaseModel, Field
 from langchain_core.prompts import PromptTemplate
@@ -40,28 +41,22 @@ class MCQGenerator:
         try:
             parser = JsonOutputParser(pydantic_object=MCQOutput)
 
-            template = """
-You are an expert exam paper setter.
+            template = """You are an expert exam paper setter.
 
 Generate EXACTLY {num_questions} MCQs.
 
-STRICT RULES:
-- Output MUST be a SINGLE valid JSON object
-- Do NOT add numbering like 1., 2.
-- Do NOT add explanations
-- Do NOT add markdown
-- Do NOT add extra text
+IMPORTANT: Return ONLY valid JSON, nothing else. No explanation, no markdown, no extra text.
 
-The root object MUST be:
+The response must be a single valid JSON object with this exact structure:
 {{
   "mcqs": [
     {{
-      "question": "string",
+      "question": "the question text here",
       "options": [
-        {{ "option_id": "A", "text": "string" }},
-        {{ "option_id": "B", "text": "string" }},
-        {{ "option_id": "C", "text": "string" }},
-        {{ "option_id": "D", "text": "string" }}
+        {{"option_id": "A", "text": "option A text"}},
+        {{"option_id": "B", "text": "option B text"}},
+        {{"option_id": "C", "text": "option C text"}},
+        {{"option_id": "D", "text": "option D text"}}
       ],
       "correct_option": "A"
     }}
@@ -73,7 +68,8 @@ Topic: {topic}
 Subject: {subject}
 
 {format_instructions}
-"""
+
+Now generate the JSON:"""
 
             prompt = PromptTemplate(
                 template=template,
@@ -105,7 +101,9 @@ Subject: {subject}
 
             item = raw_output[0]
             if isinstance(item, dict) and "generated_text" in item:
-                return item["generated_text"]
+                # Extract only the newly generated text, not the input prompt
+                full_text = item["generated_text"]
+                return full_text
 
         # Case 3: LLMResult style
         if hasattr(raw_output, "generations"):
@@ -116,8 +114,44 @@ Subject: {subject}
             return raw_output.content
 
         raise MCQGenerationException(
-            f"Could not extract text from model output: {type(raw_output)}"
+            f"Could not extract text from model output: {type(raw_output)}\nOutput: {str(raw_output)[:500]}"
         )
+
+    def extract_json_from_text(self, text: str) -> str:
+        """
+        Extract JSON object from text that may contain other content.
+        Finds the first { and last } that form a valid JSON object.
+        """
+        # Find the first opening brace
+        start_idx = text.find('{')
+        if start_idx == -1:
+            raise MCQGenerationException(f"No JSON object found in output: {text[:300]}")
+        
+        # Try to find matching closing brace
+        brace_count = 0
+        end_idx = -1
+        
+        for i in range(start_idx, len(text)):
+            if text[i] == '{':
+                brace_count += 1
+            elif text[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    end_idx = i + 1
+                    break
+        
+        if end_idx == -1:
+            raise MCQGenerationException(f"Malformed JSON in output: {text[:300]}")
+        
+        json_str = text[start_idx:end_idx]
+        
+        # Validate it's actual JSON
+        try:
+            json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise MCQGenerationException(f"Invalid JSON extracted: {str(e)}\nJSON: {json_str[:300]}")
+        
+        return json_str
 
 
     def generate(self, input_request: dict) -> MCQOutput:
@@ -126,17 +160,32 @@ Subject: {subject}
         raw_output = chain.invoke(input_request)
         output_text = self.extract_text(raw_output)
 
+        # Extract JSON from potentially mixed text content
         try:
-            parsed = parser.parse(output_text)
-        except OutputParserException:
+            json_text = self.extract_json_from_text(output_text)
+        except MCQGenerationException:
+            json_text = output_text
+
+        try:
+            parsed = parser.parse(json_text)
+        except OutputParserException as e:
             raise MCQGenerationException(
-                f"Invalid JSON from model.\n--- RAW OUTPUT ---\n{output_text}"
+                f"Invalid JSON from model.\n--- EXTRACTED JSON ---\n{json_text}\n--- ERROR ---\n{str(e)}"
+            )
+        except Exception as e:
+            raise MCQGenerationException(
+                f"Unexpected error during parsing.\n--- EXTRACTED JSON ---\n{json_text}\n--- ERROR ---\n{str(e)}"
             )
 
         
+        if parsed is None:
+            raise MCQGenerationException(
+                f"Parser returned None. JSON text was:\n{json_text}"
+            )
+
         if not isinstance(parsed, MCQOutput):
             raise MCQGenerationException(
-                f"Parser returned unexpected type: {type(parsed)}"
+                f"Parser returned unexpected type: {type(parsed)}. Expected MCQOutput.\nJSON was:\n{json_text}"
             )
 
         if len(parsed.mcqs) != input_request["num_questions"]:
