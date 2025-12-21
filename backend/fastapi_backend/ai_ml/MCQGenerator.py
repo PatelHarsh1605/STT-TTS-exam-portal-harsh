@@ -4,8 +4,6 @@ import json
 
 from pydantic import BaseModel, Field
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.exceptions import OutputParserException
 
 from ai_ml.ModelCreator import HFModelCreation
 from ai_ml.AIExceptions import *
@@ -39,8 +37,8 @@ class MCQGenerator:
 
     def create_chain(self):
         try:
-            parser = JsonOutputParser(pydantic_object=MCQOutput)
-
+            # Simple template without JsonOutputParser format instructions
+            # We handle parsing manually in generate()
             template = """You are an expert exam paper setter.
 
 Generate EXACTLY {num_questions} MCQs.
@@ -67,22 +65,16 @@ Topic ID: {topic_id}
 Topic: {topic}
 Subject: {subject}
 
-{format_instructions}
-
-Now generate the JSON:"""
+Generate the JSON response now:"""
 
             prompt = PromptTemplate(
                 template=template,
-                input_variables=["num_questions",
-                                 "topic_id", "topic", "subject"],
-                partial_variables={
-                    "format_instructions": parser.get_format_instructions()
-                }
+                input_variables=["num_questions", "topic_id", "topic", "subject"]
             )
 
             chain = prompt | self.get_model()
 
-            return chain, parser
+            return chain, None  # Return None for parser since we handle it manually
 
         except Exception as e:
             raise ChainCreationException(
@@ -166,26 +158,29 @@ Now generate the JSON:"""
         except MCQGenerationException:
             json_text = output_text
 
+        # Parse JSON directly without LangChain's JsonOutputParser due to errors
         try:
-            parsed = parser.parse(json_text)
-        except OutputParserException as e:
+            json_dict = json.loads(json_text)
+        except json.JSONDecodeError as e:
             raise MCQGenerationException(
-                f"Invalid JSON from model.\n--- EXTRACTED JSON ---\n{json_text}\n--- ERROR ---\n{str(e)}"
+                f"Failed to parse JSON: {str(e)}\n--- JSON TEXT ---\n{json_text[:500]}"
+            )
+
+        # Manually validate and create MCQOutput using Pydantic
+        try:
+            parsed = MCQOutput(**json_dict)
+        except ValueError as e:
+            raise MCQGenerationException(
+                f"Invalid MCQ structure: {str(e)}\n--- JSON ---\n{json.dumps(json_dict, indent=2)[:500]}"
             )
         except Exception as e:
             raise MCQGenerationException(
-                f"Unexpected error during parsing.\n--- EXTRACTED JSON ---\n{json_text}\n--- ERROR ---\n{str(e)}"
+                f"Unexpected error creating MCQOutput: {str(e)}\n--- JSON ---\n{json.dumps(json_dict, indent=2)[:500]}"
             )
 
-        
         if parsed is None:
             raise MCQGenerationException(
-                f"Parser returned None. JSON text was:\n{json_text}"
-            )
-
-        if not isinstance(parsed, MCQOutput):
-            raise MCQGenerationException(
-                f"Parser returned unexpected type: {type(parsed)}. Expected MCQOutput.\nJSON was:\n{json_text}"
+                f"Failed to create MCQOutput from valid JSON: {json_text[:300]}"
             )
 
         if len(parsed.mcqs) != input_request["num_questions"]:
