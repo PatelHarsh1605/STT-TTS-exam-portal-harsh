@@ -9,7 +9,7 @@ from ai_ml.AIExceptions import *
 
 
 class MCQOption(BaseModel):
-    option_id: str = Field(..., description="Option label like A, B, C, D")
+    option_id: str
     text: str
 
 
@@ -81,33 +81,11 @@ Now generate {num_questions} MCQs with sequential numbering:"""
                 f"Could not create chain due to error: {str(e)}")
 
     def extract_text(self, raw_output) -> str:
-
-        # Case 1: LangChain returns string
-        if isinstance(raw_output, str):
-            return raw_output
-
-        # Case 2: HuggingFacePipeline returns list[dict]
-        if isinstance(raw_output, list):
-            if len(raw_output) == 0:
-                raise MCQGenerationException("Empty output from model")
-
+        if isinstance(raw_output, list) and len(raw_output) > 0:
             item = raw_output[0]
             if isinstance(item, dict) and "generated_text" in item:
-                # Extract only the newly generated text, not the input prompt
-                full_text = item["generated_text"]
-                return full_text
-
-        # Case 3: LLMResult style
-        if hasattr(raw_output, "generations"):
-            return raw_output.generations[0][0].text
-
-        # Case 4: content attribute
-        if hasattr(raw_output, "content"):
-            return raw_output.content
-
-        raise MCQGenerationException(
-            f"Could not extract text from model output: {type(raw_output)}\nOutput: {str(raw_output)[:500]}"
-        )
+                return item["generated_text"]
+        raise MCQGenerationException(f"Could not extract text from model output: {type(raw_output)}")
 
     def generate(self, input_request: dict) -> MCQOutput:
         chain = self.create_chain()
@@ -121,93 +99,52 @@ Now generate {num_questions} MCQs with sequential numbering:"""
         return MCQOutput(mcqs=mcqs)
 
     def parse_mcqs_from_text(self, text: str, expected_count: int) -> List[MCQ]:
-        """
-        Parse MCQs from plain text format:
-        
-        Question 1: [text]?
-        A) [text]
-        B) [text]
-        C) [text]
-        D) [text]
-        Answer: [A/B/C/D]
-        """
         mcqs = []
-        
-        # Split by "Question N:" pattern
         question_pattern = r'Question\s+\d+:\s*(.+?)(?=Question\s+\d+:|$)'
         question_blocks = re.findall(question_pattern, text, re.IGNORECASE | re.DOTALL)
         
         if not question_blocks:
-            raise MCQGenerationException(
-                f"Could not find any MCQs in output. Expected {expected_count} MCQs.\n"
-                f"Output was:\n{text[:500]}"
-            )
+            raise MCQGenerationException(f"Could not find any MCQs in output. Expected {expected_count} MCQs.")
 
-        # Parse all found questions
         for block in question_blocks:
             try:
-                mcq = self.parse_single_mcq(block)
-                mcqs.append(mcq)
-            except Exception as e:
-                # Skip malformed questions and continue
-                print(f"Warning: Could not parse MCQ block: {str(e)}")
+                mcqs.append(self.parse_single_mcq(block))
+            except Exception:
                 continue
 
-        # If we got more questions than expected, take only the first N
         if len(mcqs) > expected_count:
-            print(f"Warning: Generated {len(mcqs)} MCQs but expected {expected_count}. Taking first {expected_count}.")
             mcqs = mcqs[:expected_count]
-        
-        # Check if we have enough questions
-        if len(mcqs) < expected_count:
-            raise MCQGenerationException(
-                f"Expected {expected_count} MCQs, but only got {len(mcqs)}"
-            )
+        elif len(mcqs) < expected_count:
+            raise MCQGenerationException(f"Expected {expected_count} MCQs, but only got {len(mcqs)}")
 
         return mcqs
 
     def parse_single_mcq(self, block: str) -> MCQ:
-        """Parse a single MCQ from text block"""
-        
-        # Extract question
         question_match = re.search(r'^(.+?)(?=\nA\)|A\))', block, re.DOTALL)
         if not question_match:
             raise MCQGenerationException("Could not find question text")
         
-        question_text = question_match.group(1).strip()
-        # Remove "Question N:" prefix if present
-        question_text = re.sub(r'^Question\s+\d+:\s*', '', question_text, flags=re.IGNORECASE).strip()
+        question_text = re.sub(r'^Question\s+\d+:\s*', '', question_match.group(1).strip(), flags=re.IGNORECASE).strip()
         
-        # Extract options
-        options = []
         option_pattern = r'([A-D])\)\s*(.+?)(?=[A-D]\)|Answer:|$)'
         option_matches = re.findall(option_pattern, block, re.DOTALL | re.IGNORECASE)
         
         if len(option_matches) < 4:
-            raise MCQGenerationException(f"Could not find 4 options. Found {len(option_matches)}")
+            raise MCQGenerationException("Could not find 4 options")
         
-        for option_id, option_text in option_matches[:4]:
-            option_text = option_text.strip()
-            # Remove trailing newlines and extra whitespace
-            option_text = re.sub(r'\n+.*$', '', option_text).strip()
-            options.append(MCQOption(option_id=option_id.upper(), text=option_text))
+        options = [
+            MCQOption(option_id=opt_id.upper(), text=re.sub(r'\n+.*$', '', opt_text.strip()).strip())
+            for opt_id, opt_text in option_matches[:4]
+        ]
         
-        # Extract correct answer
         answer_match = re.search(r'Answer:\s*([A-D])', block, re.IGNORECASE)
         if not answer_match:
             raise MCQGenerationException("Could not find Answer field")
         
         correct_option = answer_match.group(1).upper()
         
-        # Validate correct option is in options
         option_ids = {opt.option_id for opt in options}
         if correct_option not in option_ids:
-            raise MCQGenerationException(
-                f"Correct option '{correct_option}' not in options {option_ids}"
-            )
+            raise MCQGenerationException(f"Correct option '{correct_option}' not in options {option_ids}")
         
-        return MCQ(
-            question=question_text,
-            options=options,
-            correct_option=correct_option
-        )
+        return MCQ(question=question_text, options=options, correct_option=correct_option)
