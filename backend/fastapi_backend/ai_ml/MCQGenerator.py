@@ -41,9 +41,11 @@ class MCQGenerator:
 
 Generate EXACTLY {num_questions} MCQs on the following topic.
 
+IMPORTANT: Number each question sequentially as Question 1:, Question 2:, Question 3:, etc.
+
 FORMAT: Use this exact format for each question:
 
-Question {num}: [Question text here?]
+Question 1: [Question text here?]
 A) [Option A text]
 B) [Option B text]
 C) [Option C text]
@@ -52,11 +54,18 @@ Answer: [A/B/C/D]
 
 ---
 
+Question 2: [Next question text here?]
+A) [Option A text]
+B) [Option B text]
+C) [Option C text]
+D) [Option D text]
+Answer: [A/B/C/D]
+
 Topic ID: {topic_id}
 Topic: {topic}
 Subject: {subject}
 
-Generate the MCQs now:"""
+Now generate {num_questions} MCQs with sequential numbering:"""
 
             prompt = PromptTemplate(
                 template=template,
