@@ -81,6 +81,8 @@ Now generate {num_questions} MCQs with sequential numbering:"""
                 f"Could not create chain due to error: {str(e)}")
 
     def extract_text(self, raw_output) -> str:
+        if isinstance(raw_output, str):
+            return raw_output
         if isinstance(raw_output, list) and len(raw_output) > 0:
             item = raw_output[0]
             if isinstance(item, dict) and "generated_text" in item:
